@@ -79,7 +79,7 @@ def calculate_VaR_from_portfolio(positions_df, prices_df, conf=0.99, lookback = 
     return VaR
 
 
-def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=1):
+def calculate_VaR(levels=["Total", "BUSINESS LINE","METAL"], conf=0.99, lookback=365, T=1):
     print("Step 2: Loading Data positions and prices from DB to perform VaR calculation.")
     positions_df, prices_df = cp.get_data()
 
