@@ -148,6 +148,47 @@ def get_data():
     return positions_df, prices_df
 
 
+def detect_outliers_zscore(
+    df: pd.DataFrame,
+    threshold: float = 4.0,
+    price_col: str = "QuoteValue",
+    group_cols: list = ["Metal", "MaturityMonth", "Exchange"]
+) -> pd.DataFrame:
+    """
+    Detect and flag outliers in price data using z-score method within groups.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe containing price data.
+    threshold : float
+        Z-score threshold to flag outliers (e.g., 4.0 = ~0.006% of normal dist).
+    price_col : str
+        Name of the price column.
+    group_cols : list
+        Columns to group by before computing z-scores (e.g., instrument level).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with an extra column 'is_outlier' (True/False).
+    """
+
+    df = df.copy()
+    df["is_outlier"] = False
+
+    def flag_group(group):
+        prices = group[price_col]
+        z_scores = (prices - prices.mean()) / prices.std(ddof=0)
+        return z_scores.abs() > threshold
+
+    df["is_outlier"] = df.groupby(group_cols, group_keys=False).apply(flag_group)
+
+    outliers = df[df["is_outlier"]==True]
+
+    return len(outliers)
+
+
 #positions_df, prices_df = load_and_clean_data()
 
 

@@ -83,6 +83,11 @@ def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=
     print("Step 2: Loading Data positions and prices from DB to perform VaR calculation.")
     positions_df, prices_df = cp.get_data()
 
+    out = cp.detect_outliers_zscore(prices_df)
+    print("###########")
+    print(f"There are {out} outliers in total. ")
+    print("###########")
+
     VaR_Total = "error"
     VaR_Levels = {}
 
@@ -90,6 +95,8 @@ def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=
         if level == "Total":
             try:
                 VaR_Total = calculate_VaR_from_portfolio(positions_df, prices_df, conf, lookback) * (T ** 0.5)
+                print("######")
+                print(f"TOTAL VAR: {VaR_Total} ")
             except Exception as e:
                 print(f" Error calculating Total VaR: {e}")
         else:
@@ -99,15 +106,22 @@ def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=
                     continue
 
                 VaR_Levels[level] = {}
+                print("######")
+                print(f"VaR of {level} :")
                 elements = list(positions_df[level].unique())
 
                 for el in elements:
                     sub_df = positions_df[positions_df[level] == el].copy()
                     VaR_el = calculate_VaR_from_portfolio(sub_df, prices_df, conf, lookback) * (T ** 0.5)
                     VaR_Levels[level][el] = VaR_el
+                    print(f"VaR of {el} : {VaR_el} ")
+                    print("######")
 
             except Exception as e:
                 print(f" Error calculating VaR for level '{level}': {e}")
+
+
+
 
     return VaR_Total, VaR_Levels
 
@@ -149,10 +163,10 @@ def export_var_to_excel(var_total, var_levels, output_path="results_var_summary.
     print(f"✅ VaR results exported to: {output_path}")
 
 
-positions_df, prices_df = cp.get_data()
+#positions_df, prices_df = cp.get_data()
 #calculate_VaR_from_portfolio(positions_df, prices_df)
 
-result = calculate_VaR(T=1)
+result = calculate_VaR()
 
 print("Saving Results to Excel...")
 export_var_to_excel(result[0],result[1])
