@@ -6,6 +6,7 @@ import numpy as np
 
 def compute_covariance_matrix(prices_df: pd.DataFrame, lookback_days: int) -> pd.DataFrame:
     """
+
     Compute the covariance matrix of daily returns for all instruments
     defined by (Metal, MaturityMonth, Exchange), over a given lookback period.
 
