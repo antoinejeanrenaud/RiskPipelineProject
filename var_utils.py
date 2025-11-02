@@ -67,7 +67,7 @@ def compute_portfolio_value(positions_df: pd.DataFrame) -> float:
     float : total value of the portfolio
     """
     df = positions_df.copy()
-    df["position_value"] = df["Net_Volume"] * df["QuoteValue"]
+    df["position_value"] = df["Net_Volume"].abs() * df["QuoteValue"]
     return df["position_value"].sum()
 
 def compute_asset_weights(positions_df: pd.DataFrame) -> pd.Series:
