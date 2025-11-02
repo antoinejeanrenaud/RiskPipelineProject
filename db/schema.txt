@@ -1,0 +1,38 @@
+Database name: risk.sqlite
+Location: db/risk.sqlite
+
+-----------------------------------------------------
+Table: raw_positions
+-----------------------------------------------------
+Description:
+    Contains the position data for three business lines (Prop, Copper, and ZincLead).
+    Each row represents a futures contract position, including its maturity,
+    contract type, business line, strategy, and other trade characteristics.
+
+Columns:
+    - MATURITY: Contract maturity date
+    - CONTRACTTYPE: Type of contract (e.g., Future)
+    - BUSINESS LINE: Name of the business line (e.g., Copper, Prop, ZincLead)
+    - STRATEGY: Trading strategy (e.g., Arbitrage)
+    - METAL: Underlying metal for the position
+    - EXCHANGE: Exchange where the contract is traded (e.g., LME, CMX)
+    - CURRENCY: Currency of the contract (e.g., USD)
+    - LONGSHORT: Indicates if the position is Long (L) or Short (S)
+    - VOLUME: Trade volume of the position
+    - UNIT: Unit of measurement for the volume (e.g., MT, LB)
+    - business_line: Added automatically by the ingestion script to identify the source file
+
+-----------------------------------------------------
+Table: raw_prices
+-----------------------------------------------------
+Description:
+    Contains historical price data for each metal and maturity date.
+    Used to calculate historical Value-at-Risk (VaR) and other risk metrics.
+
+Columns:
+    - Price Date: Date of the quoted price
+    - Maturity: Contract maturity date
+    - QuoteValue: Price or quote value for that contract
+    - Metal: Metal name (e.g., Copper, Zinc, Lead)
+    - Exchange: Exchange of the quoted contract (e.g., LME)
+    - Unit: Unit of the quote (e.g., USD/MT)

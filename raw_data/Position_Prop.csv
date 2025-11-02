@@ -1,0 +1,5 @@
+MATURITY,CONTRACTTYPE,BUSINESS LINE,STRATEGY,METAL,EXCHANGE,CURRENCY,LONGSHORT, VOLUME , UNIT 
+12/30/2025,Future,Prop,Calendar Spread,Copper,LME,USD,L,"5,000", MT 
+11/30/2025,Future,Prop,Directional,Copper,LME,USD,L,"3,000", MT 
+1/31/2026,Future,Prop,Calendar Spread,Copper,LME,USD,S,"5,000", MT 
+12/31/2025,Future,Prop,Directional,Copper,LME,USD,L,"1,000", MT 

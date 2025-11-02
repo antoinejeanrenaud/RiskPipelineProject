@@ -1,0 +1,22 @@
+SELECT pos.*, prices.QuoteValue, prices.[Price Date]
+FROM raw_positions AS pos
+LEFT JOIN (
+    SELECT p.Metal,
+           p.Maturity,
+           p.Exchange,
+           p.QuoteValue,
+           p.[Price Date]
+    FROM raw_prices AS p
+    INNER JOIN (
+        SELECT Metal, Maturity, Exchange, MAX([Price Date]) AS MaxDate
+        FROM raw_prices
+        GROUP BY Metal, Maturity, Exchange
+    ) AS latest
+    ON p.Metal = latest.Metal
+       AND p.Maturity = latest.Maturity
+       AND p.Exchange = latest.Exchange
+       AND p.[Price Date] = latest.MaxDate
+) AS prices
+ON pos.METAL = prices.Metal
+AND pos.MATURITY = prices.Maturity
+AND pos.EXCHANGE = prices.Exchange;
