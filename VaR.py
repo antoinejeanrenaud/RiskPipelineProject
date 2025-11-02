@@ -1,15 +1,12 @@
 import Clean_process as cp
 import var_utils as var
-#import Ingest as ingest
+import Ingest as ingest
 import pandas as pd
-from datetime import timedelta
-from scipy.stats import norm
-import sqlite3
-import numpy as np
-from pathlib import Path
 
 from var_utils import calculate_parametric_var
 
+print("Step 1: Importing Raw Data in DB")
+ingest.save_raw_data_to_db()
 
 def merge_latest_prices(positions_df: pd.DataFrame, prices_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -83,6 +80,7 @@ def calculate_VaR_from_portfolio(positions_df, prices_df, conf=0.99, lookback = 
 
 
 def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=1):
+    print("Step 2: Loading Data positions and prices from DB to perform VaR calculation.")
     positions_df, prices_df = cp.get_data()
 
     VaR_Total = "error"
@@ -156,5 +154,6 @@ positions_df, prices_df = cp.get_data()
 
 result = calculate_VaR(T=1)
 
+print("Saving Results to Excel...")
 export_var_to_excel(result[0],result[1])
 
