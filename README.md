@@ -6,7 +6,7 @@ This project implements a modular Python pipeline to calculate historical Value-
 
 ## Structure
 
-- `Ingest.py`: Loads raw CSV files and saves them to a SQLite database (`db/risk.sqlite`).
+- `Ingest.py`: Loads raw CSV files and saves them to a SQLite database (`db/risk.sqlite`). The database (risk.sqlite) is built using the save_raw_data_to_db() function in Ingest.py, which loads data from CSV and writes it to the database. Therefore, there is no separate .sql script — it is fully managed via Python
 - `Clean_process.py`: Loads data from the database and applies cleaning/standardization (e.g., fixing types, removing whitespace).
 - `var_utils.py`: Contains the full set of utilities to compute:
   - Covariance matrix of returns
