@@ -90,7 +90,7 @@ def calculate_VaR(levels=["Total", "BUSINESS LINE"], conf=0.99, lookback=365, T=
 
     VaR_Total = "error"
     VaR_Levels = {}
-
+    print("Step 3: VaR calculation...")
     for level in levels:
         if level == "Total":
             try:
