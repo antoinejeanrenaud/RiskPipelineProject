@@ -2,6 +2,10 @@ import Clean_process as cp
 import var_utils as var
 import Ingest as ingest
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import numbers
+from openpyxl.chart import BarChart, Reference
+from openpyxl.utils import get_column_letter
 
 from var_utils import calculate_parametric_var
 
@@ -147,20 +151,62 @@ def export_var_to_excel(var_total, var_levels, output_path="results_var_summary.
     """
 
     # Create Excel writer
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        # Total VaR sheet
-        df_total = pd.DataFrame({"VaR": [var_total]})
-        df_total.to_excel(writer, sheet_name="Total_VaR", index=False)
+def save_var_report(var_total, var_levels, output_path="VaR_Report.xlsx"):
+        """
+        Save the VaR results to an Excel report with formatting and charts.
+        """
+        # Step 1: Save the basic DataFrames to Excel
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            # Total VaR
+            df_total = pd.DataFrame({"VaR": [var_total]})
+            df_total.to_excel(writer, sheet_name="Total_VaR", index=False)
 
-        # VaR by level sheets
-        for level_name, level_dict in var_levels.items():
-            df_level = pd.DataFrame.from_dict(level_dict, orient="index", columns=["VaR"])
-            df_level.index.name = level_name
-            df_level.reset_index(inplace=True)
-            sheet_name = f"VaR_by_{level_name.replace(' ', '_')[:31]}"  # Excel sheet name limit
-            df_level.to_excel(writer, sheet_name=sheet_name, index=False)
+            # VaR by level (e.g., BUSINESS LINE)
+            for level_name, level_dict in var_levels.items():
+                df_level = pd.DataFrame.from_dict(level_dict, orient="index", columns=["VaR"])
+                df_level.index.name = level_name
+                df_level.reset_index(inplace=True)
+                sheet_name = f"VaR_by_{level_name.replace(' ', '_')[:31]}"
+                df_level.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    print(f"✅ VaR results exported to: {output_path}")
+        # Step 2: Open workbook for formatting and charting
+        wb = load_workbook(output_path)
+
+        # Format Total_VaR
+        ws_total = wb["Total_VaR"]
+        ws_total["A1"] = "Total VaR (USD)"
+        ws_total["A2"].number_format = numbers.FORMAT_CURRENCY_USD_SIMPLE
+
+        # Format and chart each VaR by level sheet
+        for sheet in wb.sheetnames:
+            if sheet.startswith("VaR_by_"):
+                ws = wb[sheet]
+                max_row = ws.max_row
+
+                # Apply USD currency format to VaR column
+                for row in range(2, max_row + 1):
+                    cell = ws[f"B{row}"]
+                    cell.number_format = numbers.FORMAT_CURRENCY_USD_SIMPLE
+
+                # Create bar chart
+                chart = BarChart()
+                chart.type = "bar"
+                chart.title = "VaR by " + sheet.replace("VaR_by_", "").replace("_", " ")
+                chart.y_axis.title = "VaR (USD)"
+                chart.x_axis.title = sheet.split("VaR_by_")[-1]
+
+                data = Reference(ws, min_col=2, min_row=1, max_row=max_row)
+                cats = Reference(ws, min_col=1, min_row=2, max_row=max_row)
+                chart.add_data(data, titles_from_data=True)
+                chart.set_categories(cats)
+                chart.width = 12
+                chart.height = 6
+
+                ws.add_chart(chart, f"D2")
+
+        # Save enhanced Excel
+        wb.save(output_path)
+        print(f"✅ Enhanced VaR report saved to: {output_path}")
 
 
 #positions_df, prices_df = cp.get_data()
@@ -169,5 +215,5 @@ def export_var_to_excel(var_total, var_levels, output_path="results_var_summary.
 result = calculate_VaR()
 
 print("Saving Results to Excel...")
-export_var_to_excel(result[0],result[1])
+save_var_report(result[0],result[1])
 
