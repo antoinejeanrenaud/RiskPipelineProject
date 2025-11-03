@@ -2,6 +2,7 @@ import Clean_process as cp
 import var_utils as var
 import Ingest as ingest
 import pandas as pd
+from datetime import datetime, timedelta
 from openpyxl import load_workbook
 from openpyxl.styles import numbers
 from openpyxl.chart import BarChart, Reference
@@ -60,6 +61,122 @@ def merge_latest_prices(positions_df: pd.DataFrame, prices_df: pd.DataFrame) -> 
     })
 
     return merged
+
+
+def merge_prices_on_date(positions_df: pd.DataFrame, prices_df: pd.DataFrame, date: str) -> pd.DataFrame:
+    """
+    For each row in positions_df, add the QuoteValue from prices_df
+    for the specified date, matched by METAL, MaturityMonth, and EXCHANGE.
+
+    Parameters
+    ----------
+    positions_df : pd.DataFrame
+        Portfolio with columns: METAL, MaturityMonth, EXCHANGE, Net_Volume, etc.
+
+    prices_df : pd.DataFrame
+        Historical prices with columns: Metal, MaturityMonth, Exchange, Price Date, MTQuote
+
+    date : str
+        Target pricing date (format: 'YYYY-MM-DD')
+
+    Returns
+    -------
+    pd.DataFrame
+        positions_df with 'QuoteValue' and 'Price Date' (if match exists)
+    """
+
+    # Normalize column names
+    prices = prices_df.rename(columns={
+        "Metal": "METAL",
+        "Exchange": "EXCHANGE",
+        "MTQuote": "QUOTE",
+        "Price Date": "PRICE_DATE"
+    }).copy()
+
+    # Ensure date column is datetime
+    prices["PRICE_DATE"] = pd.to_datetime(prices["PRICE_DATE"], dayfirst=True, errors="coerce")
+
+    # Target date as datetime
+    target_date = pd.to_datetime(date)
+
+    # Filter for target date only
+    prices_on_date = prices[prices["PRICE_DATE"] == target_date]
+
+    # Merge on exact match: METAL, MaturityMonth, EXCHANGE
+    merged = positions_df.merge(
+        prices_on_date[["METAL", "MaturityMonth", "EXCHANGE", "QUOTE", "PRICE_DATE"]],
+        on=["METAL", "MaturityMonth", "EXCHANGE"],
+        how="left"
+    )
+
+    # Rename for clarity
+    merged = merged.rename(columns={
+        "QUOTE": "QuoteValue",
+        "PRICE_DATE": "Price Date"
+    })
+
+    return merged
+
+def compute_portfolio_value_time_series(positions_df: pd.DataFrame, prices_df: pd.DataFrame, lookback_days: int) -> pd.DataFrame:
+    """
+    Compute a time series of portfolio values over a historical window
+    using exact daily prices from the prices_df.
+
+    Parameters
+    ----------
+    positions_df : pd.DataFrame
+        Portfolio with columns: METAL, MaturityMonth, EXCHANGE, Net_Volume
+
+    prices_df : pd.DataFrame
+        Historical prices with columns: Metal, MaturityMonth, Exchange, Price Date, MTQuote
+
+    lookback_days : int
+        Number of calendar days to look back from the most recent price date
+
+    Returns
+    -------
+    pd.DataFrame : columns = ['Date', 'PortfolioValue']
+    """
+
+    # Prepare price data
+    prices = prices_df.rename(columns={
+        "Metal": "METAL",
+        "Exchange": "EXCHANGE",
+        "MTQuote": "QUOTE",
+        "Price Date": "PRICE_DATE"
+    }).copy()
+    prices["PRICE_DATE"] = pd.to_datetime(prices["PRICE_DATE"], dayfirst=True, errors="coerce")
+    prices = prices.dropna(subset=["PRICE_DATE"])
+
+    # Get list of dates to evaluate
+    end_date = prices["PRICE_DATE"].max()
+    start_date = end_date - timedelta(days=lookback_days)
+    date_range = pd.date_range(start=start_date, end=end_date)
+
+    values = []
+    for date in date_range:
+        # Filter prices for this day
+        daily_prices = prices[prices["PRICE_DATE"] == date]
+
+        # Skip if no prices available
+        if daily_prices.empty:
+            continue
+
+        # Merge with positions
+        merged = positions_df.merge(
+            daily_prices[["METAL", "MaturityMonth", "EXCHANGE", "QUOTE"]],
+            on=["METAL", "MaturityMonth", "EXCHANGE"],
+            how="left"
+        )
+
+        # Calculate position value
+        merged["position_value"] = merged["Net_Volume"] * merged["QUOTE"]
+        portfolio_value = merged["position_value"].sum()
+
+        # Store result
+        values.append({"Date": date, "PortfolioValue": portfolio_value})
+
+    return pd.DataFrame(values)
 
 def calculate_VaR_from_portfolio(positions_df, prices_df, conf=0.99, lookback = 365):
     positions_df = merge_latest_prices(positions_df, prices_df)
@@ -129,26 +246,155 @@ def calculate_VaR(levels=["Total", "BUSINESS LINE","METAL"], conf=0.99, lookback
 
     return VaR_Total, VaR_Levels
 
+def calculate_historical_VaR(
+            levels = ["Total", "BUSINESS LINE", "METAL"],
+            conf: float = 0.99,
+            lookback: int = 365
+    ):
+        """
+        Calculate Historical VaR for the full portfolio and optionally for breakdowns.
+
+        Parameters
+        ----------
+        levels : list of str
+            Levels in the position data to break down VaR (e.g., BUSINESS LINE, METAL).
+        conf : float
+            Confidence level for Historical VaR.
+        lookback : int
+            Lookback window in calendar days.
+
+        Returns
+        -------
+        Tuple containing total VaR and a dictionary with VaR by levels.
+        """
+        print("Step 2: Loading data for Historical VaR...")
+        positions_df, prices_df = cp.get_data()
+
+        out = cp.detect_outliers_zscore(prices_df)
+        print("###########")
+        print(f"There are {out} outliers in total.")
+        print("###########")
+
+        VaR_Total = "error"
+        VaR_Levels = {}
+
+        print("Step 3: Historical VaR calculation...")
+        for level in levels:
+            if level == "Total":
+                try:
+                    VaR_Total = var.compute_historical_var(positions_df,prices_df,lookback, conf)
+                    print("######")
+                    print(f"TOTAL HISTORICAL VAR: {VaR_Total}")
+                except Exception as e:
+                    print(f"Error calculating Total Historical VaR: {e}")
+            else:
+                try:
+                    if level not in positions_df.columns:
+                        print(f"⚠️ Column '{level}' not found in positions data.")
+                        continue
+
+                    VaR_Levels[level] = {}
+                    print(f"### Historical VaR by '{level}' ###")
+                    elements = list(positions_df[level].unique())
+
+                    for el in elements:
+                        sub_df = positions_df[positions_df[level] == el].copy()
+                        VaR_el = var.compute_historical_var(sub_df, prices_df, lookback, conf)
+                        VaR_Levels[level][el] = VaR_el
+                        print(f"VaR of {el}: {VaR_el}")
+
+                except Exception as e:
+                    print(f"Error calculating VaR for level '{level}': {e}")
+
+        return VaR_Total, VaR_Levels
 
 
-def export_var_to_excel(var_total, var_levels, output_path="results_var_summary.xlsx"):
+def run_var_analysis(historical: bool = False,
+                     levels: list = ["Total", "BUSINESS LINE"],
+                     conf: float = 0.99,
+                     lookback: int = 365,
+                     T: int = 1):
     """
-    Export VaR results to an Excel file with:
-    - Sheet 1: Total Portfolio VaR
-    - Sheet 2+: Business line-level VaRs (one sheet per level)
+    Run either historical or parametric VaR analysis.
 
     Parameters
     ----------
-    var_total : float
-        The total portfolio VaR.
+    historical : bool
+        If True, compute Historical VaR; else compute Parametric VaR.
+    levels : list
+        List of breakdown levels (e.g., ["Total", "BUSINESS LINE", "METAL"])
+    conf : float
+        Confidence level (e.g., 0.99 for 99% VaR)
+    lookback : int
+        Lookback period in calendar days
+    T : int
+        Time horizon in days (used only in parametric VaR)
 
-    var_levels : dict
-        Dictionary where keys are levels (e.g., "BUSINESS LINE") and values are
-        dictionaries of individual VaRs per group.
-
-    output_path : str
-        Path to save the Excel file.
+    Returns
+    -------
+    Tuple : (VaR_Total, VaR_by_Level_Dict)
     """
+
+    if historical:
+        print("Running Historical VaR...")
+        return calculate_historical_VaR(levels=levels, conf=conf, lookback=lookback)
+    else:
+        print("Running Parametric (Normal) VaR...")
+        return calculate_VaR(levels=levels, conf=conf, lookback=lookback, T=T)
+
+# Example of how to create a class
+class VaR:
+        def __init__(self,
+                     historical: bool = True,
+                     levels: list = ["Total", "BUSINESS LINE"],
+                     confidence: float = 0.99,
+                     lookback_days: int = 365,
+                     holding_period: int = 1):
+            """
+            Wrapper class for Value-at-Risk analysis (historical or parametric).
+
+            Parameters
+            ----------
+            historical : bool
+                If True, use historical VaR; otherwise parametric VaR.
+            levels : list
+                List of groupings to compute VaR by (e.g. 'BUSINESS LINE', 'METAL', etc.)
+            confidence : float
+                Confidence level (e.g. 0.99 for 99%)
+            lookback_days : int
+                Number of calendar days to look back
+            holding_period : int
+                Horizon in days (used only in parametric)
+            """
+            self.historical = historical
+            self.levels = levels
+            self.conf = confidence
+            self.lookback = lookback_days
+            self.T = holding_period
+
+        def compute(self):
+            """
+            Run the VaR analysis using the configured method.
+
+            Returns
+            -------
+            Tuple : (Total VaR, VaR by level dictionary)
+            """
+            if self.historical:
+                print("Running Historical VaR...")
+                return calculate_historical_VaR(
+                    levels=self.levels,
+                    conf=self.conf,
+                    lookback=self.lookback
+                )
+            else:
+                print("Running Parametric (Normal) VaR...")
+                return calculate_VaR(
+                    levels=self.levels,
+                    conf=self.conf,
+                    lookback=self.lookback,
+                    T=self.T
+                )
 
     # Create Excel writer
 def save_var_report(var_total, var_levels, output_path="VaR_Report.xlsx"):
@@ -210,9 +456,16 @@ def save_var_report(var_total, var_levels, output_path="VaR_Report.xlsx"):
 
 
 #positions_df, prices_df = cp.get_data()
-#calculate_VaR_from_portfolio(positions_df, prices_df)
+#timeserie = var.compute_portfolio_value_time_series(positions_df, prices_df)
 
-result = calculate_VaR()
+#var = calculate_historical_VaR()
+#var.compute_historical_var(positions_df, prices_df)
+
+result = run_var_analysis(historical=True, levels=["Total", "BUSINESS LINE", "METAL"],conf=0.99,lookback=365)
+
+### Simple Example on how we can uses classes to compute VaR ###
+#Model = VaR(historical= True,levels = ["Total", "BUSINESS LINE"],confidence = 0.99,lookback_days = 365)
+#Model.compute()
 
 print("Saving Results to Excel...")
 save_var_report(result[0],result[1])
