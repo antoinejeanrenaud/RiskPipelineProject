@@ -37,8 +37,9 @@ pip install -r requirements.txt
 
 ### 2. Run the VaR script
 
+Select if you want Parametric VaR or historical version
 Select confidence level wanted for the VaR (0.95, 0.99)
-Select the number of days looking forward for the VaR using T as variable set by default to 1
+Select the number of days looking forward for the VaR using T as variable set by default to 1 (Only for parametric)
 Select the lookbback period that is set by default to 365 days
 
 ```
@@ -51,6 +52,7 @@ This will process the data, calculate VaR, and export an Excel report.
 Weights computed using **signed monetary exposure**
 - Handles futures contracts differentiated by Metal, Maturity, and Exchange
 - Covariance matrix built using filtered historical prices
+- FOr the Historical method it uses realized past P&L
 
 ## Reporting
 
