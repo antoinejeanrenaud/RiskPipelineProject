@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ### 2. Run the VaR script
 
 Select confidence level wanted for the VaR (0.95, 0.99)
-Select the number of days looking forward for the VaR using T as variable
+Select the number of days looking forward for the VaR using T as variable set by default to 1
 Select the lookbback period that is set by default to 365 days
 
 ```
@@ -57,3 +57,9 @@ Weights computed using **signed monetary exposure**
 The pipeline produces:
 - VaR at total portfolio level
 - VaR by business line (3 groups)
+- VaR by Metal (2 groups)
+
+## Results
+
+- The results are easy to reproduce as there is no monte carlo simulation. From parametric VaR you get the same results without specifying a random fixed seed.
+- The pipeline produces a simple Excel file that can be then opened manually.
